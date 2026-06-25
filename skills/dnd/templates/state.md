@@ -1,6 +1,14 @@
 # Campaign: <name>
 **Created:** <date>  **Last session:** —  **Session count:** 0  **Ruleset:** 2014
 
+## Content Bounds
+*Campaign-wide content settings — set at creation, changeable any time the player asks (the change persists here). The DM reads this at every load and honors it all session. See SKILL.md → Safety & Bounds.*
+
+**Intimacy tier:** Fade to black  *(None | Fade to black | Tasteful | Explicit — adult characters only)*
+**Intensity tier:** Cinematic  *(Off-screen | Cinematic | Visceral | Graphic — violence/horror)*
+**Lines** *(never appear):* none set
+**Veils** *(off-screen only):* none set
+
 ## Current Situation
 - **Location:**
 - **In-world date/time:**

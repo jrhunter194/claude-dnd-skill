@@ -10,6 +10,12 @@ Versions before **1.6.0** are reconstructed retroactively from git history; the 
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-06-25 — Content safety bounds + hidden dice mode + quieter session start
+
+- **Content safety & bounds framework.** A new `## Safety & Bounds` spine in the DM rules (loaded every session) sets three hard lines and two adjustable content dials — **Intimacy** (None / Fade to black / Tasteful / Explicit) and **Intensity** (Off-screen / Cinematic / Visceral / Graphic) — stored per campaign in `state.md → ## Content Bounds`. Each dial is a *ceiling, not a quota*; either can change at any time via the out-of-character (`ooc`) channel, which also carries lines (never appear), veils (off-screen only), "skip ahead," and drift call-outs. `/dm:dnd new` sets the dials once in prose (no menu); `/dm:dnd load` reads and honors them. Hard lines (no sexualization of minors; no actionable real-world harm instructions; don't harm the real player) always apply regardless of the dials. Full reference in `docs/safety-framework.md`. Backward compatible — legacy campaigns default to Fade to black / Cinematic.
+- **`roll_mode: hidden` is now a documented, first-class dice mode.** The DM rolls *everything* (PCs included) silently via `dice.py --silent` and narrates outcomes only — no checks, DCs, or math surfaced, so the fact that a check is being made is never meta-knowledge. Selectable as a third option at campaign creation alongside `players` and `auto`.
+- **Session-start menus no longer re-prompt a returning campaign.** `/dm:dnd load` now skips the display/dice picker when a campaign already has a saved `roll_mode` (session count > 0): it silently honors the saved roll handling and defaults to no display, printing a single one-line status instead. The picker only appears on a fresh campaign's first load or when the player explicitly changes session setup.
+
 ## [2.2.2] — 2026-06-22 — Display input fixes — reading column clears PARTY INPUT, honest send-failure
 
 - **Display: the PARTY INPUT box no longer covers the bottom of the narration.** The fixed input panel grows when it expands (or the editorial drawer opens, or the mobile keyboard raises the viewport). The reading column now reserves bottom space equal to the panel's live on-screen footprint via a `ResizeObserver`, so the last lines of narration always clear it.
