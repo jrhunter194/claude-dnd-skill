@@ -18,6 +18,7 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
    **Q2 *"Dice rolls?"*** — set how PC d20s are handled (see SKILL.md "Dice convention"):
    - `Players roll their own` (default) → write `roll_mode: players` to `state.md → ## Session Flags`. You will call for each PC roll and wait — never auto-roll a PC.
    - `DM rolls everything openly` → write `roll_mode: auto`. You resolve PC rolls yourself with full math shown.
+   - `DM rolls everything, hidden` → write `roll_mode: hidden`. You resolve all d20s (PCs included) silently via `dice.py --silent` and narrate only outcomes — no checks, DCs, or math shown. Best for solo / immersive play.
 
    Default to `roll_mode: players` if the question is dismissed.
 2. **Ruleset selection (added 2026-05-08).** Ask: *"D&D 5e ruleset for this campaign? **2014** (SRD 5.1, default — full mechanics, classic Player's Handbook structure) or **2024** (SRD 5.2, weapon mastery + origin feats + background ASIs + revised exhaustion)?"* Default to `2014` if no answer or ambiguous. Write the chosen value to `state.md` header line as `**Ruleset:** 2014` or `**Ruleset:** 2024`.
@@ -32,6 +33,7 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
    - Setting type: `medieval / renaissance / ancient / nautical / underground`
    - Danger level: `lethal / gritty / standard / heroic`
    *(If `[theme]` supplied, pre-fill Tone and ask remaining three. Randomise any blank via dice.py and log `"d6=N → [result]"` in world.md.)*
+6b. **Content bounds (one-time, prose — NOT an `AskUserQuestion` picker).** In one short message, state the two content dials with their defaults and invite a change: *"Two content dials, both ceilings you can move any time during play: **Intimacy** (default Fade to black) and **Intensity / violence** (default Cinematic). Want either set differently — or any hard lines (never appear) or veils (off-screen only) I should lock in? Otherwise I'll run the defaults."* Write the chosen tiers + any lines/veils to `state.md → ## Content Bounds` (the section is in the template). Accept a natural-language answer or silence (= defaults); do not force a menu. The campaign-wide hard lines in SKILL.md → Safety & Bounds always apply regardless of the dials.
 7. **World Foundations** — geography/biome/climate, magic system, pantheon (2–3 active deities), calendar. Write to `## World Foundations` in world.md. Seed `state.md → ## World State → In-world date`.
 8. **Three Truths** — one settlement, one nearby threat, one mystery (with clue trail). Write to respective sections in world.md.
 9. **Threat Escalation Arc** — fill the five-stage table in world.md immediately after threat generation. Set current stage to 1. Write `Threat arc stage: 1 — Now` to `state.md → ## World State`.
@@ -68,7 +70,11 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
 
 ## `/dm:dnd load <campaign-name>`
 0. **Pick the campaign if none was named.** If `<campaign-name>` was supplied (or the player clearly named one), use it. Otherwise `ls` the campaigns dir (`~/.claude/dnd/campaigns/` or `$DND_CAMPAIGN_ROOT/campaigns/`) and **call `AskUserQuestion`**: *"Which campaign?"* with the existing campaign names as options (most-recently-played first — sort by `state.md` mtime). The player can pick "Other" to type a name. If there are no campaigns, tell them and offer `/dm:dnd new`.
-1. **Session setup — call `AskUserQuestion`** with **two questions** (not typed y/n prompts):
+1. **Session setup.**
+
+   **Returning campaign → skip the picker entirely.** If `state.md` has a saved `roll_mode` (i.e. session count > 0, not a first load), do **not** show the setup questions. Silently honor the saved `roll_mode` and default to **no display** (solo is the norm here). Print a single line: *"Running `<roll_mode>` · no display — say so (or `ooc`) if you want the display up or rolls handled differently."* Then continue to step 2. Only run the two-question picker below for a **fresh campaign's first load**, or when the player **explicitly asks** to change session setup.
+
+   **Fresh campaign / explicit setup change — call `AskUserQuestion`** with **two questions** (not typed y/n prompts):
 
    **Q1 *"Display & input mode?"***
    - `No display` → continue without display.
@@ -79,6 +85,7 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
    **Q2 *"Dice rolls?"*** — confirm how PC d20s are handled this session (see SKILL.md "Dice convention"). Pre-fill the recommended option from the existing `roll_mode` in `state.md` if present, else `players`:
    - `Players roll their own` → write `roll_mode: players`. Call for each PC roll and wait — never auto-roll a PC.
    - `DM rolls everything openly` → write `roll_mode: auto`. Resolve PC rolls yourself with full math shown.
+   - `DM rolls everything, hidden` → write `roll_mode: hidden`. Resolve all d20s (PCs included) silently; narrate outcomes only — no checks, DCs, or math.
 
    - (Defaults if the player dismisses: no display, no autorun, `roll_mode: players` — or the existing saved value.)
    - **Session tail replay:** before clearing the display, check if the campaign's `session_tail.json` exists. The campaign-side path is the authoritative one — `~/.claude/dnd/campaigns/<name>/session_tail.json`. **Do NOT read** the legacy/fallback at `${CLAUDE_SKILL_DIR}/display/session_tail.json`; that file may exist from older sessions or other campaigns and will mislead the replay. If the campaign-side file does not exist, skip replay (display starts blank). If it does, read it. After `--clear` and full stats push (step 4 below), replay the tail by sending each entry via the appropriate `send.py` flag. Entry type → flag mapping:
@@ -121,6 +128,7 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
 4. Read SKILL-scripts.md (for script syntax this session)
 5. **Mark this campaign active** (for the autosave hook): write `{"name": "<campaign-name>"}` to `$(python3 ${CLAUDE_SKILL_DIR}/scripts/paths.py runtime-dir)/active-campaign.json`. This is what `autosave_checkpoint.py` reads to know which campaign to checkpoint; a stale marker is harmless. Then read state.md, world.md, npcs.md (index only), and all characters/*.md
    - **state.md contains `## DM Style Notes`** — read and internalize before narrating anything. These are table-specific calibration patterns that override default DM instincts.
+   - **state.md contains `## Content Bounds`** — read it and re-ground in SKILL.md → Safety & Bounds before narrating. The two dials (Intimacy, Intensity) plus any lines/veils govern content all session; honor them and the hard lines without exception. (Legacy campaigns predating this section: treat as defaults — Intimacy `Fade to black`, Intensity `Cinematic` — and offer to set them once via OOC.)
    - **world.md:** Load in full — World Foundations, Three Truths, and factions inform narration and faction moves. Do NOT read `world-seeds.md` at load (generation artifact, not live reference).
    - **world-nodes.md (imported campaigns only):** Do **NOT** load at session start. It holds the full Quest Seed Bank and Adventure Nodes for the whole module; read only the current act's nodes on demand when a scene needs them. If the file is absent (dynamic/sandbox, or an older import), there is nothing to lazy-load — `world.md` already carries the nodes, unchanged from prior behavior.
    - **arc.md (imported campaigns only):** Do **NOT** load at session start. `state.md → ## Campaign Arc` already carries the current + next chapter window. Read `arc.md` only when advancing chapters or when a player asks about the broader arc. If absent, the arc lives inline in `state.md` (dynamic/sandbox) — read it there as before.
