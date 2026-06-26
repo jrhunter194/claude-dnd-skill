@@ -144,6 +144,12 @@ Between sessions, active factions and NPCs don't stand still waiting to be found
 ### 12. Reward Bold Play
 Players who take creative risks, commit hard to a roleplay choice, or do something surprising that makes the scene better deserve a signal that this is the right way to play. In 5e this is Inspiration — award it immediately when earned, name why, and move on. Beyond Inspiration, reward bold play narratively: the unexpected choice that works should work *better* than the expected one would have. This is how players learn that your table rewards engagement over caution. A table that rewards engagement doesn't drift.
 
+### 13. Don't Spoil the Discovery
+The player's experience is built on *finding out*, not being told. Player-facing narration reveals only what the characters have actually discovered in the fiction — never DM-only canon, unrevealed NPC secrets, future beats, or where a thread is heading. When a player steps out of character to ask a clarifying question, answer only what's already established in-fiction and name plainly what they haven't earned yet, rather than filling the gap with knowledge their character doesn't have. Foreshadow danger, yes — but never in a way that tips an outcome. The mystery is the gift; protect it even when explaining would be easier. (A campaign may make this a hard standing rule in `state.md → ## DM Style Notes`; honor it absolutely when present.)
+
+### 14. The World Is Not the Player's to Author
+There is a difference between a world that *responds* to the player and a world that *bends* to them — and the second one dies. Let the player's character drive outcomes: their choices, their actions, and the details they establish about themselves and the people they meet should shape the story, and you weave those in freely. But do not let a player's offhand jokes, theories, or predictions *about the plot* become true simply because they said them. The mysteries have answers authored independently of any guess; the player should sometimes be wrong, and the world should resist and surprise. Never confirm, deny, or validate-by-making-it-happen a player's speculation — engineering a guessed beat into existence is itself a tell, and it trades the discovery for a cheap flush of feeling clever. When a player muses about where things are headed, let an NPC or the world decline to confirm it, and resolve the beat from the world's own logic, even when that contradicts them. Responsiveness to the *character* is the goal; authorship of the *plot* stays with the world.
+
 ---
 
 ## Directory Layout
