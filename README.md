@@ -177,6 +177,15 @@ The skill follows [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH
 /dm:dnd load my-campaign                        # start a session — Claude enforces the arc
 ```
 
+**Bundled adventure** — import an original module that ships with this repo:
+
+```
+/dm:dnd import falling-stars adventures/falling-stars/falling-stars.md   # The Falling Stars (levels 1–5)
+/dm:dnd load falling-stars                                               # start a session
+```
+
+See [`adventures/`](adventures/) for the catalog of ready-to-import modules.
+
 Once loaded, type naturally — no `/dm:dnd` prefix needed. The DM interprets everything as in-game action.
 
 ---
