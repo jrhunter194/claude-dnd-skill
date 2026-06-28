@@ -723,12 +723,51 @@ def cmd_extract_apply(args) -> int:
     return 0
 
 
+def cmd_status(args) -> int:
+    """Report graph freshness for the /dnd load staleness guard.
+
+    The graph is a *derived projection* of the session logs — never hand-edited.
+    The load-time guard compares `newest_session` here against state.md's session
+    count; if the graph is behind (or absent), it runs an automatic
+    extract -> extract-apply catch-up before querying scene-context. Prints
+    machine-readable key: value lines plus a `behind:`/`current:` verdict when
+    --session is supplied.
+    """
+    p = _graph_path(args.campaign)
+    present = p.exists()
+    data = _load(args.campaign)
+    sessions = []
+    for coll in (data["nodes"], data["edges"]):
+        for item in coll:
+            for k in ("since_session", "since", "until_session"):
+                v = item.get(k)
+                if isinstance(v, int):
+                    sessions.append(v)
+    newest = max(sessions) if sessions else 0
+    print("present" if present else "absent")
+    print(f"newest_session: {newest}")
+    print(f"nodes: {len(data['nodes'])}")
+    print(f"edges: {len(data['edges'])}")
+    if getattr(args, "session", None) is not None:
+        behind = (not present) or newest < args.session
+        print(f"state_session: {args.session}")
+        print("verdict: behind" if behind else "verdict: current")
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(prog="campaign_graph")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def add_camp(sp):
         sp.add_argument("--campaign", required=True)
+
+    sp = sub.add_parser("status",
+        help="Report graph freshness (newest stamped session + counts) for the load-time staleness guard")
+    add_camp(sp)
+    sp.add_argument("--session", type=int, default=None,
+                    help="current state.md session count; prints a behind/current verdict when given")
+    sp.set_defaults(func=cmd_status)
 
     sp = sub.add_parser("add-node")
     add_camp(sp)

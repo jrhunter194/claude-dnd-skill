@@ -197,7 +197,29 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
    python3 ${CLAUDE_SKILL_DIR}/display/push_stats.py --quests '[...]'
    ```
    The quest panel only appears when at least one quest is present — do not skip this push.
-7. **Pull scene-context from the campaign graph.** Always run, even if you suspect `graph.json` doesn't exist — the script exits cleanly with a notice when uninitialized.
+7. **Sync, then pull scene-context from the campaign graph.** The graph is a **derived projection** of the session logs — never hand-curated — so the load path *rebuilds it to current* before querying instead of trusting whatever is on disk. This is what prevents the graph from silently falling sessions behind `state.md` (the failure mode the old approval-gated init suffered).
+
+   **7a. Staleness guard (run first, always).** Check whether the graph has fallen behind the canonical session count:
+   ```bash
+   python3 ${CLAUDE_SKILL_DIR}/scripts/campaign_graph.py status \
+     --campaign <campaign-name> --session <current-session-N>
+   ```
+   `<current-session-N>` is `state.md → ## Session Count`. If the last line reads **`verdict: current`**, skip ahead to 7b. If it reads **`verdict: behind`** (the graph is stale, or `absent` = never seeded), run the catch-up below — **no approval prompt**; the graph is a derived view, so rebuild rather than ask.
+
+   **The catch-up is performed by you (the DM), in-loop.** You are already an LLM reading the campaign at load — so you do the extraction directly, which is the only method that works on every platform (the script back-ends below are optional accelerators that are frequently unavailable: the deterministic seed needs PyYAML and has low recall on free-form prose, and the Haiku pass shells out to a `claude` binary that may not be on PATH). Procedure:
+   1. Read the sessions newer than the graph's `newest_session` — from `session-log.md` (and `session-log-archive.md` if the gap is large), plus `state.md → ## Live State Flags` for current dispositions/factions.
+   2. For each **new entity** (NPC, faction, place, item, thread) and each **relationship shift** (alliance, betrayal, membership, lives-in, controls, knows-secret, lover/kin, thread advance/block), issue an `add-node` / `add-edge` call. Stamp `--since <session-N>` with the session the fact became canon. **Apply them all — no batch, no approval.**
+      ```bash
+      python3 ${CLAUDE_SKILL_DIR}/scripts/campaign_graph.py add-node --campaign <name> --type npc --name "<Name>" --summary "<one line>"
+      python3 ${CLAUDE_SKILL_DIR}/scripts/campaign_graph.py add-edge --campaign <name> --from "<id-or-name>" --to "<id-or-name>" --type <edge_type> --since <N> --note "<anchor>"
+      ```
+   3. Re-run `status`; confirm `verdict: current`.
+
+   **Optional accelerator:** if PyYAML is installed *and* a quick `extract --deterministic --write "$TMP"` returns a non-zero proposal count, you may `extract-apply --proposals "$TMP"` (apply all) to save manual calls, then fill any gaps by hand per step 2. Treat it as a head-start, never the whole job — verify against the log and finish in-loop. Never leave the guard reporting `behind`.
+
+   **Backup before a from-scratch seed only** (`status` said `absent` on a campaign with history): `cp -R ~/.claude/dnd/campaigns/<name> ~/.claude/dnd/campaigns/<name>.backup-$(date +%Y%m%d-%H%M%S)` and tell the DM the path. A routine tail catch-up needs no backup — it only appends nodes/edges.
+
+   **7b. Query scene-context** (now current):
    ```bash
    python3 ${CLAUDE_SKILL_DIR}/scripts/campaign_graph.py scene-context \
      --campaign <campaign-name> \
@@ -206,35 +228,11 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
      --hops 2 \
      --at-session <current-session-N>
    ```
-   Identify `<current-location>` from `state.md → ## World State → location` (or the most recent location in `## Recent Events`). Identify `<present>` from the NPCs likely on-scene per `state.md` / `session-log.md`. `<current-session-N>` is `state.md → ## Session Count`.
+   Identify `<current-location>` from `state.md → ## World State → location` (or the most recent location in `## Recent Events`). Identify `<present>` from the NPCs likely on-scene per `state.md` / `session-log.md`.
 
-   Output is a focused subgraph (nodes by type + relationships block). **Internalize this subgraph before delivering the recap** — it is the authoritative source for who-relates-to-whom in the current scene. Do not re-read `npcs-full.md` for relationships you can answer from the subgraph.
+   Output is a focused subgraph (nodes by type + relationships block). **Internalize this subgraph before delivering the recap** — it is the authoritative source for who-relates-to-whom in the current scene. Do not re-read `npcs-full.md` for relationships you can answer from the subgraph. If a `--place`/`--present` name isn't a node even after catch-up (the extractor keys off log phrasing and may miss a place), fall back to `state.md → ## Live State Flags` for that scene's relationships — do **not** hand-add nodes to `graph.json`; corrections belong in the logs/`state.md` and flow in on the next sync.
 
-   If output reads `# graph not initialized` — graph hasn't been seeded for this campaign yet. **Graph init is a hard requirement, not deferrable.** The continuity-archive compression rule (step 6 below + `/dm:dnd save`) assumes graph.json is present and canonical for relational state; deferring init creates state-archive drift that compounds session-over-session. Run the init flow before delivering the recap:
-
-   1. **Detect legacy.** A campaign is "legacy" if any of: `Session count > 1` in state.md header, OR `## Continuity Archive` has at least one `### Session N` entry, OR session-log.md is > 100 lines. A freshly-created campaign at `/dm:dnd new` time fails all three signals — do NOT classify it as legacy.
-
-   2. **Backup the campaign directory** (always — both fresh and legacy):
-      ```bash
-      cp -R ~/.claude/dnd/campaigns/<name> \
-            ~/.claude/dnd/campaigns/<name>.backup-$(date +%Y%m%d-%H%M%S)
-      ```
-      Tell the DM the backup path explicitly so they can revert if needed.
-
-   3. **Run `/dm:dnd graph init <name>`** — propose seed nodes/edges from `npcs.md`, `world.md`, and `state.md` (Live State Flags + Active Quests + recent NPC dispositions). Show the DM a single approval block (counts by type + named entries) and ask for one go/no-go. After approval, batch-execute the `add-node` and `add-edge` calls. Use `--since N` matching when each node/edge first became canon (use `1` for foundational; the actual session number for newer NPCs/edges).
-
-   4. **Validate** with a `scene-context` query at the current location to confirm the subgraph is reachable.
-
-   5. **(Legacy only)** Offer the one-time Continuity Archive compression pass:
-
-      > "This campaign is legacy ({session_count} sessions, {archive_count} archive entries). Now that `graph.json` is the canonical source for faction memberships, NPC dispositions, and typed-edge relationships, I can do a one-time pass to trim the existing `## Continuity Archive` entries of relational restatements that the graph now answers. Mechanical changes, plot beats, atmospheric/decision moments, and disclosed information stay in full. Estimated reduction: 5–30% of archive bytes (varies by how relational vs. content-heavy your existing entries are). Backup is already at `<backup-path>`. Proceed? [y/n]"
-
-      - `y` → trim each archive entry surgically; keep the bullet structure; remove ONLY pure-relational restatements (e.g. "X is allied with Y", "Z saw the party's faces", "W is a member of faction F") that have a corresponding edge in the just-initialized graph. Preserve: XP/level/items/HP, plot beats ("Beat 2a sealed"), atmospheric moments, disclosed content, calibration material, off-screen world events. Add a one-line note at the top of `## Continuity Archive`: *"Compressed YYYY-MM-DD (graph init pass). Relational state is canonical in graph.json — entries below preserve mechanical changes, plot beats, disclosed content, atmospheric/decision moments, and calibration material."*
-      - `n` → leave the archive untouched. The going-forward compression rule (per `/dm:dnd save`) still applies to NEW entries from this session forward.
-
-      For fresh (non-legacy) campaigns: skip the offer entirely — there's nothing to compress yet, and the going-forward rule covers all future entries.
-
-   6. Re-run scene-context (now populated). Then proceed to step 6 (recap).
+   **Never hand-edit `graph.json`.** It is rebuilt from canon every load (here) and every save (the auto-sync sweep). Any manual edit is overwritten on the next pass.
 
 8. Deliver one in-character paragraph recapping current situation — where the party is, what's at stake, what was last happening.
 9. Enter active DM mode — no `/dm:dnd` prefix needed from this point.
@@ -417,23 +415,18 @@ Treat each bullet as one sentence with one job. If the only job is "restate a gr
 
 The continuity summary is what stays hot in context. The full verbose log is in the archive, readable on `/dm:dnd recap` or explicit request. When a past detail surfaces mid-scene, check `## Continuity Archive` first, then `/dm:dnd graph scene-context` for relational context, then read session-log-archive.md if more depth is needed.
 
-**Campaign-graph relationship-shift sweep:** before completing the save, scan this session's narration for relationship shifts that weren't captured live via `/dm:dnd graph add-edge` / `close-edge`. Look for moments matching these patterns:
+**Campaign-graph auto-sync (derived projection — no approval gate):** the graph is a *derived view* of the session logs, never hand-curated, so it cannot drift from canon. After `session-log.md` is written this save, append this session's new nodes/edges — do **not** present a proposal batch, do **not** ask for approval. As at load (step 7a), **you (the DM) perform the sync in-loop** — it's the only method reliable across platforms:
 
-- New alliance, betrayal, or rivalry between named NPCs / factions ("Velkyn now serves the Pale Court")
-- An NPC moving into / out of a location ("Mira fled the Citadel for the Lowmarket")
-- A faction taking control of (or losing) a place ("House Tarn lost the silver mine")
-- A character learning a secret ("the party now knows Velkyn was the spy")
-- A quest / thread ending or being blocked
+1. From this session's narration and the updated `## Live State Flags`, identify every **new entity** and every **relationship shift** that matches: new alliance / betrayal / rivalry; an NPC moving into or out of a place; a faction taking or losing control of a place; a character learning a secret; a quest/thread ending or being blocked; a new lover/kin bond.
+2. For each, run an `add-edge` (or `add-node` for a first appearance, or `close-edge` for a relationship that ended), stamping `--since <current-session-N>` from `state.md`. **Apply them all — no numbered batch, no `[y/pick/skip]` prompt.**
+   ```bash
+   python3 ${CLAUDE_SKILL_DIR}/scripts/campaign_graph.py add-edge --campaign <name> --from "<id-or-name>" --to "<id-or-name>" --type <edge_type> --since <N> --note "<verbatim anchor>"
+   ```
+3. Report a **one-line** result (e.g. *"graph sync: +2 nodes, +4 edges"*). Nothing new this session = say "graph: no relationship changes" and move on.
 
-For each candidate, draft an `add-edge` or `close-edge` call. Then **present the batch to the DM as a numbered list** and ask: *"Apply all? [y / pick / skip]"*
-
-- `y` → run all proposed calls via `python3 ${CLAUDE_SKILL_DIR}/scripts/campaign_graph.py ...`
-- `pick` → DM names the numbers to apply (e.g. `1, 3, 5`); skip the rest
-- `skip` → don't apply any
-
-Always supply `--since <current-session-N>` from state.md. Never write proposed edges silently.
-
-If `graph.json` doesn't exist yet for this campaign, skip the sweep entirely (no proposal block) — graph isn't seeded.
+- **Optional accelerator:** if PyYAML is installed, a quick `extract --deterministic --last-session-only --write "$TMP"` then `extract-apply --proposals "$TMP"` (apply all) can save manual calls when it yields proposals — but it has low recall on free-form prose (often returns nothing), so always finish the job in-loop per step 2 rather than trusting it to be complete.
+- **Never hand-edit `graph.json` directly** (the JSON file). Writing through `add-edge`/`add-node`/`close-edge` *is* the supported path — those are the derive operations. A fact you miss is self-correcting: it's caught by the next save sweep or the load-time staleness guard.
+- If `graph.json` doesn't exist yet, these `add-*` calls create it; the load-time guard will also seed it from full history on next load. A missing file here is harmless.
 
 ---
 
@@ -774,9 +767,9 @@ Manage the dynamic campaign arc. The `advance`/`revise`/`new` subcommands are ac
 
 ## `/dm:dnd graph <subcommand>` — campaign relationship graph
 
-Local-only typed-edge relationship graph supplementing markdown. Stored at `~/.claude/dnd/campaigns/<name>/graph.json`. Supplements `npcs-full.md` / `session-log.md` — does not replace them. Edges are time-stamped (`since_session` / `until_session`), so historical state is recoverable.
+Local-only typed-edge relationship graph **derived from** `npcs-full.md` / `session-log.md` (the canonical sources) — an index over them, never a parallel hand-maintained copy. Stored at `~/.claude/dnd/campaigns/<name>/graph.json`. Edges are time-stamped (`since_session` / `until_session`), so historical state is recoverable. Because it is always rebuilt from canon, it **cannot drift** — and for the same reason, **`graph.json` is never hand-edited**: corrections go into `state.md` / the logs and flow in on the next sync.
 
-**Auto-pulled at `/dm:dnd load` step 5** (scene-context) and **swept at `/dm:dnd save`** (relationship-shift extraction). The DM also uses `/dm:dnd graph scene-context` on demand mid-session, especially before heavy social or political scenes.
+**Rebuilt automatically — no approval gate.** At `/dm:dnd load` step 7 a staleness guard (`graph status`) checks the graph against `state.md`'s session count; if it's behind (or absent), the DM syncs it in-loop — reading the newer session entries and issuing `add-node`/`add-edge` calls (apply all, no approval) — *before* querying `scene-context`. At `/dm:dnd save` the same sweep appends the session's new nodes/edges. A `graph status` / `extract` script pair backs the guard (status reports freshness; deterministic `extract` is an optional accelerator when PyYAML is present and it yields proposals). The DM also uses `/dm:dnd graph scene-context` on demand mid-session, especially before heavy social or political scenes.
 
 For background reading on the design and the A/B replay study that motivated it, see `docs/research/graph/`.
 
@@ -816,10 +809,10 @@ Apply previously-extracted proposals. Without `--pick`, prompts interactively. W
 
 ### Suggested DM workflow
 
-1. **First session after install:** `/dm:dnd load` will offer to initialize the graph (with a backup-first prompt). Accept; review the proposed seed; approve.
-2. **During session:** when a relationship shifts in narration, run `/dm:dnd graph add-edge` (or `close-edge`) with `--since` set to the current session number. Don't batch this — record at the moment of the narrative change so you don't forget.
+1. **First load (or any load on a campaign with no graph yet):** `/dm:dnd load` seeds the graph automatically from full history at step 7a (the staleness guard) — no prompt, backup taken first when seeding a campaign that already has sessions. Nothing for the DM to approve.
+2. **During session (optional):** the graph stays current on its own via load/save sync, so manual edge entry is rarely needed. If you *want* an edge recorded the instant it happens, `/dm:dnd graph add-edge --since <N>` still works — but anything you skip is picked up by the next auto-sync, so it's never required.
 3. **Before a heavy social/political scene:** run `/dm:dnd graph scene-context --place <current-place> --present <key-NPCs>` to refresh which relationships matter right now.
-4. **At `/dm:dnd save`:** review the session log and add any edges you missed during play (the save flow runs an automatic sweep and presents proposals for approval).
+4. **At `/dm:dnd save`:** nothing to do — the save flow auto-syncs the session's new edges from the log (derived projection, no approval). Want a fuller pull than deterministic mode gives? Run `/dm:dnd graph extract` (Haiku-backed) manually any time.
 
 ---
 

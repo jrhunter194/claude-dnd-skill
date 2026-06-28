@@ -10,6 +10,15 @@ Versions before **1.6.0** are reconstructed retroactively from git history; the 
 
 ## [Unreleased]
 
+## [2.3.1] — 2026-06-27 — Relationship graph: single source of truth (derived projection, no drift)
+
+- **The campaign relationship graph is now a *derived projection* of the session logs — it can no longer drift out of sync with `state.md`.** Previously the graph was kept current by a manual, approval-gated sweep at `/dm:dnd save` (and a one-time approval-gated init at load); skipping that gate — easy to do across fast-moving sessions — let `graph.json` silently fall sessions behind the canonical record while `state.md` stayed accurate. The graph is now rebuilt from canon automatically, with no human gate:
+  - **Load (`/dm:dnd load` step 7) — staleness guard.** A new `campaign_graph.py status` command reports the newest session stamped in the graph; if it's behind `state.md`'s session count (or the graph is absent), the load path runs `extract → extract-apply` to catch it up *before* querying `scene-context`. No approval prompt.
+  - **Save (`/dm:dnd save`) — auto-sync sweep.** The manual *"present a numbered batch, ask Apply all? [y/pick/skip]"* flow is replaced by an automatic `extract --deterministic --last-session-only → extract-apply` (apply all). Reports a one-line result; zero proposals = already current.
+  - **`graph.json` is never hand-edited.** Corrections go into `state.md` / the logs and flow into the graph on the next sync. Manual edits are overwritten by design. `add-edge` still exists for optional live recording but is never required.
+  - Deterministic extraction (no LLM/network, ≈95% precision) is the default for the automatic paths; recall compounds because every load and save re-scans cumulatively. A manual Haiku-backed `/dm:dnd graph extract` remains available for a fuller one-off pull.
+- **New script command:** `campaign_graph.py status --campaign <name> [--session N]` — prints `present`/`absent`, newest stamped session, node/edge counts, and a `behind`/`current` verdict. Purely additive; no existing command behavior changes.
+
 ## [2.3.0] — 2026-06-25 — Content safety bounds + hidden dice mode + quieter session start
 
 - **Content safety & bounds framework.** A new `## Safety & Bounds` spine in the DM rules (loaded every session) sets three hard lines and two adjustable content dials — **Intimacy** (None / Fade to black / Tasteful / Explicit) and **Intensity** (Off-screen / Cinematic / Visceral / Graphic) — stored per campaign in `state.md → ## Content Bounds`. Each dial is a *ceiling, not a quota*; either can change at any time via the out-of-character (`ooc`) channel, which also carries lines (never appear), veils (off-screen only), "skip ahead," and drift call-outs. `/dm:dnd new` sets the dials once in prose (no menu); `/dm:dnd load` reads and honors them. Hard lines (no sexualization of minors; no actionable real-world harm instructions; don't harm the real player) always apply regardless of the dials. Full reference in `docs/safety-framework.md`. Backward compatible — legacy campaigns default to Fade to black / Cinematic.
