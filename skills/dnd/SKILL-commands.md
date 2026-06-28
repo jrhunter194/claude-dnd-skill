@@ -135,6 +135,14 @@ Full step-by-step procedures for all `/dm:dnd` slash commands. Load this file at
    - **source/<chapter-id>.md (imported campaigns only):** the full module text, one file per chapter. Never loaded at session start. Before running a scene in a chapter, read that chapter's `source/<id>.md` (the `source_ref` in the arc) — and only that chapter. This is the predefined-story equivalent of reading a single NPC's full entry on demand.
    - **npcs.md:** Index row only at load. **Before writing substantive dialogue or decisions for any named NPC, read their full entry in `npcs-full.md`.** Do not wait for an explicit `/dm:dnd npc [name]` call — do it proactively when a scene centers on that character. Index rows carry surface traits only; personality axes, relationships, and hidden goals are in the full entry.
    - **Do NOT read session-log.md at load** — recent events are already in `state.md → ## Recent Events`. Only read session-log.md if the player explicitly requests a recap, or if DM Calibration from the last 1-2 sessions is needed and not already internalized.
+5b. **Vitals single-source guard (run before trusting any state.md vitals).** The character sheet is canonical for XP/Level/HP/AC; `state.md` must only point to it. Run:
+
+   ```bash
+   python3 ${CLAUDE_SKILL_DIR}/scripts/check_drift.py --campaign <campaign-name>
+   ```
+
+   Exit 0 = clean, proceed. Any **DRIFT** line = `state.md` disagrees with a sheet — **the sheet wins**; correct `state.md` to a pointer (do not edit the sheet to match). This is why you read vitals from `characters/<name>.md`, never from a number copied into `state.md`. Duplicate warnings are non-fatal (copies to convert to pointers when convenient).
+
 6. Push full party stats to display sidebar. **CRITICAL:** use `--json` with a complete player object — **never** the `--player` shorthand here. `--player` only updates existing fields; it cannot populate the card or sheet tabs. The display shows "Full sheet not loaded" when `sheet` is absent.
 
    ```bash
@@ -360,9 +368,17 @@ Campaign "<name>" created from <source title>.
 ---
 
 ## `/dm:dnd save`
-Write session events to session-log.md, update state.md (location, active quests, party HP/resources, recent events), update any characters/*.md that changed. Mirror each updated character to global roster (`~/.claude/dnd/characters/<name>.md`).
+Write session events to session-log.md, update state.md (location, active quests, recent events), update any characters/*.md that changed.
 
-**Inspiration tracking:** On every save, record each PC's Inspiration state in `state.md → ## Current Situation → Party status`. Use explicit text: `Inspiration ✓` if held, omit or `No Inspiration` if not. Inspiration persists across sessions and is NOT cleared by long rests. Example: `Kat: HP 24/24. Inspiration ✓. Ben: HP 24/24.`
+**⚠ Single-source vitals (INVARIANT — do not violate):** numeric character vitals — **XP, Level, HP, AC, spell slots** — live in EXACTLY ONE place: each PC's `characters/<name>.md` (XP written only by `xp.py`). **Never copy a vital number into `state.md`** — `state.md`'s party/status lines carry names + non-numeric status (cover, hurt/rested, location, inspiration ✓/—), never the values. The **global roster** (`~/.claude/dnd/characters/<name>.md`) is a *derived snapshot* — regenerate it one-way *from* the campaign sheet at save (`cp characters/<name>.md` over it), do not hand-maintain it in parallel. Then run the guard:
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/scripts/check_drift.py --campaign <campaign-name>
+```
+
+Exit 0 = clean. Any **DRIFT** line = `state.md` disagrees with a sheet (the sheet always wins — fix `state.md` to a pointer, never the sheet to match state.md). Duplicate warnings = copies that haven't drifted yet; convert them to pointers.
+
+**Inspiration tracking:** On every save, record each PC's Inspiration state in `state.md → ## Current Situation → Party status` — it's a **non-numeric flag** (`Inspiration ✓` if held, omit or `No Inspiration` if not), so it's the one "vital" that lives in state.md (it persists across sessions and is NOT cleared by long rests). Example: `Kat: Inspiration ✓. Ben: no inspiration.` (No HP/level numbers — those are sheet-only.)
 
 **Update `## Live State Flags` in state.md on every save.** This section is the compaction-resistant anchor — it holds facts that prose summaries flatten. After each session, review and update:
 - **Cover:** each PC's active cover, its status (INTACT / BLOWN / PARTIAL), and the one-line reason. Remove covers that are no longer active.

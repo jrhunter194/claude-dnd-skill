@@ -10,6 +10,14 @@ Versions before **1.6.0** are reconstructed retroactively from git history; the 
 
 ## [Unreleased]
 
+### Single-source character vitals — drift made mechanically impossible
+
+- **Invariant:** numeric vitals (XP, Level, HP, AC, spell slots) live in EXACTLY ONE place — each PC's `characters/<name>.md`. `state.md` carries pointers + non-numeric status only; the global roster is a *derived snapshot* regenerated one-way from the sheet, never hand-maintained. (Same principle as 2.3.1's graph fix: one authoritative home; copies are the only source of drift.)
+- **New script:** `scripts/check_drift.py --campaign <name> [--strict] [--quiet]` — reads canonical vitals from each sheet and reports any **DRIFT** (a `state.md` stat line that disagrees — exit 1, sheet wins) or **duplicate** (a copy that hasn't drifted yet). Only enforces pipe-delimited current-state stat lines; historical/past-tense prose is intentionally ignored. Read-only; never edits.
+- **Wired in:** runs automatically at `/dm:dnd load` (new step 5b, before trusting any vitals) and `/dm:dnd save`. On a conflict the sheet is canonical — fix `state.md`, never the sheet.
+- **Template fixed at the source:** `templates/state.md`'s `Party`/`status` lines no longer print `Level | HP | AC` — they instruct names + non-numeric status only, so new campaigns can't inherit the duplication. SKILL.md / SKILL-commands.md / SKILL-scripts.md updated to match (incl. removing the old `HP 24/24` example from the save procedure).
+- **Why:** falling-stars repeatedly drifted — XP 450-vs-600 (S6), and Level 2-vs-3 / HP 13-vs-21 in `state.md` while the sheet was correct (S8). The cure is removing the second source + a guard that makes any remaining copy fail loudly, not a sync habit.
+
 ## [2.3.1] — 2026-06-27 — Relationship graph: single source of truth (derived projection, no drift)
 
 - **The campaign relationship graph is now a *derived projection* of the session logs — it can no longer drift out of sync with `state.md`.** Previously the graph was kept current by a manual, approval-gated sweep at `/dm:dnd save` (and a one-time approval-gated init at load); skipping that gate — easy to do across fast-moving sessions — let `graph.json` silently fall sessions behind the canonical record while `state.md` stayed accurate. The graph is now rebuilt from canon automatically, with no human gate:

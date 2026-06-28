@@ -358,6 +358,24 @@ Default files searched: state, log, archive, world, npcs
 
 ---
 
+## Vitals Drift Guard — `scripts/check_drift.py`
+Enforces the **single-source vitals invariant**: XP / Level / HP / AC live ONLY on `characters/<name>.md`; `state.md` must point, never copy. The sheet is canonical; the script only reports (never edits).
+
+```bash
+CAMP=my-campaign
+python3 ${CLAUDE_SKILL_DIR}/scripts/check_drift.py --campaign $CAMP            # report; exit 1 on real drift
+python3 ${CLAUDE_SKILL_DIR}/scripts/check_drift.py --campaign $CAMP --strict   # also fail on duplicate-but-matching copies
+python3 ${CLAUDE_SKILL_DIR}/scripts/check_drift.py --campaign $CAMP --quiet    # silent on a clean pass (hook use)
+```
+
+- **DRIFT** (exit 1): a structured stat line in `state.md` disagrees with the sheet (e.g. `state.md` says HP 13/13, sheet says 21/21). **The sheet always wins** — fix `state.md` to a pointer, never the sheet to match it.
+- **Duplicate** (warning): a `state.md` stat line copies a vital that *happens* to still match — a copy that will drift later; convert it to a pointer.
+- Only **pipe-delimited current-state stat lines** (the `| HP X/X | AC X |` party/resources format) are enforced; free-text/past-tense prose (historical recaps, combat snapshots) is intentionally left alone.
+
+**When to run:** automatically at `/dm:dnd load` (step 5b) and `/dm:dnd save`; any time you've touched vitals or suspect a stale number in `state.md`.
+
+---
+
 ## Data Commands — `scripts/sync_srd.py`, `scripts/build_srd.py`, and `scripts/lookup.py`
 
 Dataset is bundled at `${CLAUDE_SKILL_DIR}/data/dnd5e_srd.json`. No runtime download required.

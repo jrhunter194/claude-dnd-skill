@@ -12,8 +12,8 @@
 ## Current Situation
 - **Location:**
 - **In-world date/time:**
-- **Party:** <Name> — <Race> <Class> <Level> | HP X/X | AC X | <resources>
-- **Party status:**
+- **Party:** <Name>, <Name> — *roster + names only.* **Do NOT copy vitals here.** Level, HP, AC, spell slots, XP, inspiration live in EXACTLY ONE place — each PC's `characters/<name>.md` (XP written only by `xp.py`). To show current numbers, read the sheet or run `python scripts/check_drift.py --campaign <name>` / a sheet read — never store the values in state.md. (Copies are the only source of drift; `check_drift.py` enforces this at load/save.)
+- **Party status:** *at-a-glance, non-numeric only* — cover, condition (hurt/rested), who's where, inspiration held (✓/—). No stat values.
 
 ## World State
 - **In-world date:** <Day, Month, Year — canonical source; keep in sync above>

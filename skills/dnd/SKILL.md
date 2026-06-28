@@ -197,7 +197,9 @@ Resolve `~` to the user's home directory. Scripts locate both roots via
 | **Opus** | `claude-opus-4-6` | `/dm:dnd new` world generation; `/dm:dnd character new` pillar derivation |
 
 **Script-first rule:** Before reaching for the LLM for any calculation, check whether a script handles it:
-`dice.py` · `combat.py` · `ability-scores.py` · `character.py` · `tracker.py` · `calendar.py` · `lookup.py` · `push_stats.py`
+`dice.py` · `combat.py` · `ability-scores.py` · `character.py` · `tracker.py` · `calendar.py` · `lookup.py` · `push_stats.py` · `check_drift.py`
+
+**Single-source vitals (INVARIANT):** XP, Level, HP, AC, and spell slots live in EXACTLY ONE place — each PC's `characters/<name>.md` (XP written only by `xp.py`). **Never copy a vital number into `state.md`** — its party/status lines hold names + non-numeric status only (cover, hurt/rested, inspiration ✓/—). The global roster is a *derived snapshot*, regenerated one-way from the sheet, never hand-maintained. `check_drift.py` enforces this at `/dm:dnd load` and `/dm:dnd save`: the sheet always wins; on a conflict, fix `state.md` to a pointer, never the sheet. (Copies are the only source of drift.)
 
 Full script syntax: Read `${CLAUDE_SKILL_DIR}/SKILL-scripts.md`
 
