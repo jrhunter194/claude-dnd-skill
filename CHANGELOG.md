@@ -10,6 +10,8 @@ Versions before **1.6.0** are reconstructed retroactively from git history; the 
 
 ## [Unreleased]
 
+## [2.4.0] — 2026-06-28 — Single-source character vitals (check_drift guard, no drift)
+
 ### Single-source character vitals — drift made mechanically impossible
 
 - **Invariant:** numeric vitals (XP, Level, HP, AC, spell slots) live in EXACTLY ONE place — each PC's `characters/<name>.md`. `state.md` carries pointers + non-numeric status only; the global roster is a *derived snapshot* regenerated one-way from the sheet, never hand-maintained. (Same principle as 2.3.1's graph fix: one authoritative home; copies are the only source of drift.)
